@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom'; // Import Link
 
 const ProblemListPage = () => {
   const [problems, setProblems] = useState([]);
@@ -7,7 +8,6 @@ const ProblemListPage = () => {
   useEffect(() => {
     const fetchProblems = async () => {
       try {
-        // This is a public route, so no token is needed
         const res = await axios.get('http://localhost:5000/api/problems');
         setProblems(res.data);
       } catch (err) {
@@ -34,11 +34,11 @@ const ProblemListPage = () => {
         <h2 className="text-2xl font-bold mb-4">All Problems</h2>
         <div className="space-y-4">
           {problems.map(problem => (
-            <div key={problem._id} className="border-b pb-4">
+            // --- THIS IS THE CHANGE ---
+            <Link to={`/problem/${problem._id}`} key={problem._id} className="block border-b pb-4 hover:bg-gray-50 p-2 rounded transition-colors">
               <h3 className="text-xl font-semibold">{problem.name} <span className={`text-xs font-medium align-middle ml-2 px-2.5 py-0.5 rounded-full ${problem.difficulty === 'Easy' ? 'bg-green-100 text-green-800' : problem.difficulty === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>{problem.difficulty}</span></h3>
-              <p className="text-gray-600 mt-2">{problem.statement}</p>
-              {/* In the future, you can add a "Solve" button here */}
-            </div>
+              <p className="text-gray-600 mt-2 truncate">{problem.statement}</p>
+            </Link>
           ))}
         </div>
       </div>

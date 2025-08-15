@@ -28,7 +28,8 @@ app.use(express.json());
 app.get('/', (req, res) => res.send('API Running'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/problems', require('./routes/problems'));
-app.use('/api/users', require('./routes/users')); // This line has been added
+app.use('/api/users', require('./routes/users'));
+app.use('/api/testcases', require('./routes/testcases'));
 
 const PORT = process.env.PORT || 5000;
 

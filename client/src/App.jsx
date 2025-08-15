@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthPage from './components/AuthPage';
 import AdminDashboard from './components/AdminDashboard';
 import ProblemListPage from './components/ProblemListPage';
+import ProblemPage from './components/ProblemPage';
+
+// This is the "receptionist" component that handles redirection after login.
+const HomeRedirect = ({ userRole }) => {
+    if (userRole === 'admin') {
+        return <Navigate to="/admin" />;
+    } else {
+        return <Navigate to="/problems" />;
+    }
+};
 
 const App = () => {
   const [userRole, setUserRole] = useState(null);
@@ -13,40 +24,35 @@ const App = () => {
     const checkUserRole = async () => {
       if (token) {
         try {
-          // Create an axios instance with the auth token
-          const api = axios.create({
-            headers: { 'x-auth-token': token },
-          });
-          // Fetch the user's data from the new backend route
+          const api = axios.create({ headers: { 'x-auth-token': token } });
           const res = await api.get('http://localhost:5000/api/users/me');
-          setUserRole(res.data.role); // Set the user's role in state
+          setUserRole(res.data.role);
         } catch (err) {
           console.error('Could not fetch user role', err);
-          // If token is invalid, remove it
           localStorage.removeItem('token');
         }
       }
       setLoading(false);
     };
-
     checkUserRole();
-  }, [token]); // This effect runs whenever the token changes
+  }, [token]);
 
-  // Show a loading message while we check the user's role
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // --- The Routing Logic ---
-  if (token) {
-    if (userRole === 'admin') {
-      return <AdminDashboard />;
-    } else {
-      return <ProblemListPage />;
-    }
-  } else {
-    return <AuthPage />;
-  }
+  return (
+    <Router>
+      <Routes>
+        {/* This route now uses our smart receptionist */}
+        <Route path="/" element={!token ? <AuthPage /> : <HomeRedirect userRole={userRole} />} />
+        
+        <Route path="/admin" element={token && userRole === 'admin' ? <AdminDashboard /> : <Navigate to="/" />} />
+        <Route path="/problems" element={token ? <ProblemListPage /> : <Navigate to="/" />} />
+        <Route path="/problem/:id" element={token ? <ProblemPage /> : <Navigate to="/" />} />
+      </Routes>
+    </Router>
+  );
 };
 
 export default App;
