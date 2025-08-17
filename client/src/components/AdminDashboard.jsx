@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom'; // Import Link
 
 // --- Manage Test Cases Modal Component ---
 const ManageTestCasesModal = ({ problemId, onClose }) => {
@@ -98,7 +99,6 @@ const ManageTestCasesModal = ({ problemId, onClose }) => {
               {testCases.map((tc) => (
                 <li key={tc._id} className="py-3 flex justify-between items-start">
                   <div className="flex-1">
-                    {/* --- THIS IS THE FIX --- */}
                     <div className="text-sm font-medium text-gray-900">Input: <pre className="bg-gray-100 p-1 rounded inline-block">{tc.input}</pre></div>
                     <div className="text-sm text-gray-500 mt-1">Output: <pre className="bg-gray-100 p-1 rounded inline-block">{tc.expectedOutput}</pre></div>
                     <p className={`text-xs mt-2 font-semibold ${tc.isSample ? 'text-green-600' : 'text-red-600'}`}>{tc.isSample ? 'SAMPLE' : 'HIDDEN'}</p>
@@ -120,8 +120,17 @@ const ManageTestCasesModal = ({ problemId, onClose }) => {
 // --- Admin Dashboard Component ---
 const AdminDashboard = () => {
   const [problems, setProblems] = useState([]);
-  const [formData, setFormData] = useState({ name: '', statement: '', difficulty: 'Easy' });
-  const [editingProblem, setEditingProblem] = useState(null);
+  // --- MODIFIED: Added solutionCode to initial state ---
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    statement: '', 
+    difficulty: 'Easy',
+    solutionCode: {
+        cpp: '',
+        py: '',
+        java: ''
+    }
+  });
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProblemId, setSelectedProblemId] = useState(null);
@@ -154,30 +163,35 @@ const AdminDashboard = () => {
 
   const onChange = e => setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const onSubmit = async e => {
-    e.preventDefault();
-    const action = editingProblem ? 'update' : 'create';
-    try {
-      let res;
-      if (editingProblem) {
-        res = await api.put(`/problems/${editingProblem._id}`, formData);
-        setProblems(problems.map(p => (p._id === editingProblem._id ? res.data : p)));
-      } else {
-        res = await api.post('/problems', formData);
-        setProblems([res.data, ...problems]);
-      }
-      alert(`Problem ${action}d successfully!`);
-    } catch (err) {
-      console.error(err);
-      alert(`Failed to ${action} problem. Check the console for details.`);
-    }
-    setFormData({ name: '', statement: '', difficulty: 'Easy' });
-    setEditingProblem(null);
+  // --- NEW: Handler for nested solutionCode state ---
+  const handleSolutionCodeChange = e => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+        ...prev,
+        solutionCode: {
+            ...prev.solutionCode,
+            [name]: value
+        }
+    }));
   };
 
-  const handleEdit = (problem) => {
-    setEditingProblem(problem);
-    setFormData({ name: problem.name, statement: problem.statement, difficulty: problem.difficulty });
+  const onSubmit = async e => {
+    e.preventDefault();
+    try {
+      const res = await api.post('/problems', formData);
+      setProblems([res.data, ...problems]);
+      alert(`Problem created successfully!`);
+    } catch (err) {
+      console.error(err);
+      alert(`Failed to create problem. Check the console for details.`);
+    }
+    // --- MODIFIED: Reset all fields including solutionCode ---
+    setFormData({ 
+        name: '', 
+        statement: '', 
+        difficulty: 'Easy',
+        solutionCode: { cpp: '', py: '', java: '' }
+    });
   };
 
   const handleDelete = async (id) => {
@@ -214,7 +228,7 @@ const AdminDashboard = () => {
         </div>
 
         <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h2 className="text-2xl font-bold mb-4">{editingProblem ? 'Edit Problem' : 'Create New Problem'}</h2>
+            <h2 className="text-2xl font-bold mb-4">Create New Problem</h2>
             <form onSubmit={onSubmit}>
                 <div className="mb-4">
                     <label className="block text-gray-700">Problem Name</label>
@@ -232,14 +246,29 @@ const AdminDashboard = () => {
                         <option value="Hard">Hard</option>
                     </select>
                 </div>
+
+                {/* --- NEW: Solution Code Textareas --- */}
+                <div className="mb-4 p-4 border-t border-gray-200">
+                    <h3 className="text-lg font-semibold mb-2">Solution Code</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-gray-700 text-sm font-bold">C++ Solution</label>
+                            <textarea name="cpp" value={formData.solutionCode.cpp} onChange={handleSolutionCodeChange} className="w-full p-2 border rounded mt-1 font-mono bg-gray-50" rows="6"></textarea>
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 text-sm font-bold">Python Solution</label>
+                            <textarea name="py" value={formData.solutionCode.py} onChange={handleSolutionCodeChange} className="w-full p-2 border rounded mt-1 font-mono bg-gray-50" rows="6"></textarea>
+                        </div>
+                        <div>
+                            <label className="block text-gray-700 text-sm font-bold">Java Solution</label>
+                            <textarea name="java" value={formData.solutionCode.java} onChange={handleSolutionCodeChange} className="w-full p-2 border rounded mt-1 font-mono bg-gray-50" rows="6"></textarea>
+                        </div>
+                    </div>
+                </div>
+
                 <button type="submit" className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors">
-                    {editingProblem ? 'Update Problem' : 'Create Problem'}
+                    Create Problem
                 </button>
-                 {editingProblem && (
-                    <button type="button" onClick={() => { setEditingProblem(null); setFormData({ name: '', statement: '', difficulty: 'Easy' }); }} className="bg-gray-500 text-white px-4 py-2 rounded ml-2 hover:bg-gray-600 transition-colors">
-                    Cancel Edit
-                    </button>
-                )}
             </form>
         </div>
         
@@ -253,7 +282,9 @@ const AdminDashboard = () => {
                   <p className="text-gray-600 mt-2">{problem.statement}</p>
                 </div>
                 <div className="mt-4 md:mt-0 md:ml-4 flex-shrink-0">
-                  <button onClick={() => handleEdit(problem)} className="bg-yellow-400 text-white px-3 py-1 rounded mr-2 hover:bg-yellow-500 transition-colors text-sm">Edit</button>
+                  <Link to={`/problems/${problem._id}/edit`} className="bg-yellow-400 text-white px-3 py-1 rounded mr-2 hover:bg-yellow-500 transition-colors text-sm">
+                    Edit
+                  </Link>
                   <button onClick={() => openTestCasesModal(problem._id)} className="bg-indigo-500 text-white px-3 py-1 rounded mr-2 hover:bg-indigo-600 transition-colors text-sm">Test Cases</button>
                   <button onClick={() => handleDelete(problem._id)} className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors text-sm">Delete</button>
                 </div>

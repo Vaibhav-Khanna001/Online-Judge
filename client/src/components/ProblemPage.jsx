@@ -6,13 +6,25 @@ const ProblemPage = () => {
     const { id } = useParams();
     const [problem, setProblem] = useState(null);
     const [displayedTestCases, setDisplayedTestCases] = useState([]);
-    const [code, setCode] = useState(`function solve() {\n  // Your code here\n}`);
+    const [code, setCode] = useState('');
     const [customInput, setCustomInput] = useState('');
-
-    // --- State and Refs for Resizing ---
-    const [topPaneHeight, setTopPaneHeight] = useState(65); // Initial height of code editor in %
+    const [language, setLanguage] = useState('cpp');
+    const [runResults, setRunResults] = useState({});
+    const [isRunning, setIsRunning] = useState(false);
+    const [isIncludingCustomCase, setIsIncludingCustomCase] = useState(false); // New state for custom case loading
+    const [topPaneHeight, setTopPaneHeight] = useState(65);
     const isResizing = useRef(false);
     const resizableContainerRef = useRef(null);
+
+    const boilerplates = {
+        cpp: `#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    // Your C++ code here\n    std::cout << "Hello World";\n    return 0;\n}`,
+        py: `# Your Python code here\ndef solve():\n    # Read input if necessary\n    # For example: line = input()\n    print("Hello World")\n\nsolve()`,
+        java: `class Main {\n    public static void main(String[] args) {\n        // Your Java code here\n        System.out.println("Hello World");\n    }\n}`
+    };
+
+    useEffect(() => {
+        setCode(boilerplates[language]);
+    }, [language]);
 
     useEffect(() => {
         const fetchProblem = async () => {
@@ -28,54 +40,90 @@ const ProblemPage = () => {
         fetchProblem();
     }, [id]);
 
-    const handleIncludeCustomTestCase = () => {
+    // --- UPDATED FUNCTION ---
+    const handleIncludeCustomTestCase = async () => {
         if (!customInput.trim()) {
             alert('Custom input cannot be empty.');
             return;
         }
-        const newCustomCase = {
-            _id: `custom-${Date.now()}`,
-            input: customInput,
-            expectedOutput: '(Run code to see output)',
-            isCustom: true
-        };
-        setDisplayedTestCases([...displayedTestCases, newCustomCase]);
-        setCustomInput('');
+        setIsIncludingCustomCase(true); // Set loading state to true
+
+        try {
+            // This new API endpoint runs the hidden solution code against the user's custom input
+            const api = axios.create({
+                headers: { 'x-auth-token': localStorage.getItem('token') },
+            });
+            const response = await api.post(`http://localhost:5000/api/run/solution`, {
+                problemId: id,
+                input: customInput,
+            });
+
+            const newCustomCase = {
+                _id: `custom-${Date.now()}`,
+                input: customInput,
+                expectedOutput: response.data.output, // Use the actual output from the solution
+                isCustom: true
+            };
+            setDisplayedTestCases([...displayedTestCases, newCustomCase]);
+            setCustomInput('');
+        } catch (err) {
+            console.error("Failed to generate expected output:", err);
+            alert('Could not generate the expected output for your custom input. Please try again.');
+        } finally {
+            setIsIncludingCustomCase(false); // Reset loading state
+        }
+    };
+    
+    const handleRunCode = async () => {
+        setIsRunning(true);
+        setRunResults({});
+        const newResults = {};
+
+        const api = axios.create({
+            headers: { 'x-auth-token': localStorage.getItem('token') },
+        });
+
+        for (const tc of displayedTestCases) {
+            try {
+                const response = await api.post('http://localhost:5000/api/run', {
+                    language,
+                    code,
+                    input: tc.input,
+                });
+                newResults[tc._id] = { success: true, output: response.data.output };
+            } catch (error) {
+                const errorMsg = error.response ? error.response.data.error : "Network Error";
+                newResults[tc._id] = { success: false, output: errorMsg };
+            }
+        }
+        setRunResults(newResults);
+        setIsRunning(false);
     };
 
-    // --- Resizing Logic ---
     const handleMouseDown = (e) => {
         isResizing.current = true;
-        // Attach listeners to the window to capture mouse movement everywhere
         window.addEventListener('mousemove', handleMouseMove);
         window.addEventListener('mouseup', handleMouseUp);
     };
 
     const handleMouseMove = (e) => {
         if (!isResizing.current) return;
-        
         const container = resizableContainerRef.current;
         if (!container) return;
-
         const containerTop = container.getBoundingClientRect().top;
         const containerHeight = container.offsetHeight;
-        
-        // Calculate the new height of the top pane as a percentage
         let newHeightPercent = ((e.clientY - containerTop) / containerHeight) * 100;
-
-        // Add constraints to prevent panes from becoming too small
         if (newHeightPercent < 20) newHeightPercent = 20;
         if (newHeightPercent > 80) newHeightPercent = 80;
-
         setTopPaneHeight(newHeightPercent);
     };
 
     const handleMouseUp = () => {
         isResizing.current = false;
-        // Clean up global event listeners
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
     };
+
 
     if (!problem) {
         return <div className="min-h-screen flex items-center justify-center">Loading Problem...</div>;
@@ -83,7 +131,7 @@ const ProblemPage = () => {
 
     return (
         <div className="flex flex-col md:flex-row h-screen bg-gray-100 font-sans">
-            {/* Left Section: Problem Details */}
+            {/* Left Section */}
             <div className="w-full md:w-2/5 p-6 bg-white overflow-y-auto">
                 <Link to="/problems" className="text-blue-500 hover:underline mb-4 inline-block">&larr; Back to Problems</Link>
                 <h1 className="text-3xl font-bold mb-2">{problem.name}</h1>
@@ -91,16 +139,30 @@ const ProblemPage = () => {
                 <p className="text-gray-700 mt-4 whitespace-pre-wrap">{problem.statement}</p>
             </div>
 
-            {/* Right Section: Code Editor and Test Cases */}
+            {/* Right Section */}
             <div className="w-full md:w-3/5 flex flex-col">
-                <div className="p-2 flex-shrink-0 border-b bg-white">
-                    <button className="bg-green-500 text-white px-4 py-2 rounded mr-2 hover:bg-green-600">Run</button>
-                    <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Submit</button>
+                <div className="p-2 flex-shrink-0 border-b bg-white flex justify-between items-center">
+                    <div>
+                        <button onClick={handleRunCode} disabled={isRunning} className="bg-green-500 text-white px-4 py-2 rounded mr-2 hover:bg-green-600 disabled:bg-gray-400">
+                            {isRunning ? 'Running...' : 'Run'}
+                        </button>
+                        <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Submit</button>
+                    </div>
+                    <div>
+                        <label htmlFor="language" className="mr-2 font-medium">Language:</label>
+                        <select
+                            id="language"
+                            value={language}
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="border rounded p-2"
+                        >
+                            <option value="cpp">C++</option>
+                            <option value="py">Python</option>
+                            <option value="java">Java</option>
+                        </select>
+                    </div>
                 </div>
-
-                {/* This container will hold the resizable panes */}
                 <div ref={resizableContainerRef} className="flex-grow flex flex-col">
-                    {/* Right Upper Section: Code Editor */}
                     <div className="p-4" style={{ height: `${topPaneHeight}%` }}>
                         <textarea
                             value={code}
@@ -109,30 +171,41 @@ const ProblemPage = () => {
                             style={{ fontFamily: '"Fira code", "Fira Mono", monospace', fontSize: 14 }}
                         />
                     </div>
-
-                    {/* Draggable Handle */}
-                    <div
-                        className="w-full h-2 bg-gray-300 cursor-row-resize hover:bg-blue-400 transition-colors flex-shrink-0"
-                        onMouseDown={handleMouseDown}
-                    />
-
-                    {/* Right Lower Section: Test Cases */}
+                    <div className="w-full h-2 bg-gray-300 cursor-row-resize hover:bg-blue-400 transition-colors flex-shrink-0" onMouseDown={handleMouseDown} />
                     <div className="p-4 bg-white overflow-y-auto" style={{ height: `${100 - topPaneHeight}%` }}>
                         <h2 className="text-xl font-semibold mb-2">Test Cases</h2>
                         <div className="space-y-4 mb-4">
-                            {displayedTestCases.map((tc, index) => (
-                                <div key={tc._id} className={`border rounded-lg p-3 ${tc.isCustom ? 'border-blue-300 bg-blue-50' : 'bg-gray-50'}`}>
-                                    <h3 className="font-bold">{tc.isCustom ? `Custom Case #${index + 1 - displayedTestCases.filter(c => !c.isCustom).length}` : `Sample Case #${index + 1}`}</h3>
-                                    <div className="mt-2">
-                                        <label className="text-xs font-semibold">Input:</label>
-                                        <pre className="bg-gray-200 p-2 rounded text-sm mt-1 whitespace-pre-wrap">{tc.input}</pre>
+                            {displayedTestCases.map((tc, index) => {
+                                const result = runResults[tc._id];
+                                const isCorrect = result && result.success && result.output.trim() === tc.expectedOutput.trim();
+                                
+                                return (
+                                    <div key={tc._id} className={`border rounded-lg p-3 ${tc.isCustom ? 'border-blue-300 bg-blue-50' : 'bg-gray-50'}`}>
+                                        <h3 className="font-bold">{tc.isCustom ? `Custom Case #${index + 1 - displayedTestCases.filter(c => !c.isCustom).length}` : `Sample Case #${index + 1}`}</h3>
+                                        <div className="mt-2">
+                                            <label className="text-xs font-semibold">Input:</label>
+                                            <pre className="bg-gray-200 p-2 rounded text-sm mt-1 whitespace-pre-wrap">{tc.input}</pre>
+                                        </div>
+                                        <div className="mt-2">
+                                            <label className="text-xs font-semibold">Expected Output:</label>
+                                            <pre className="bg-gray-200 p-2 rounded text-sm mt-1 whitespace-pre-wrap">{tc.expectedOutput}</pre>
+                                        </div>
+                                        {result && (
+                                            <div className="mt-2">
+                                                <label className={`text-xs font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                                    { !result.success ? 'Error:' : 
+                                                      (isCorrect || tc.isCustom) ? 'Your Output:' : 'Your Output: (Wrong Answer)'
+                                                    }
+                                                    { isCorrect && !tc.isCustom && <span className="font-bold"> (Correct)</span> }
+                                                </label>
+                                                <pre className={`p-2 rounded text-sm mt-1 whitespace-pre-wrap ${isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
+                                                    {result.output}
+                                                </pre>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="mt-2">
-                                        <label className="text-xs font-semibold">Output:</label>
-                                        <pre className="bg-gray-200 p-2 rounded text-sm mt-1 whitespace-pre-wrap">{tc.expectedOutput}</pre>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                         <div>
                             <h3 className="font-bold mb-2">Custom Input</h3>
@@ -143,8 +216,13 @@ const ProblemPage = () => {
                                 placeholder="Enter your custom input here..."
                                 rows="3"
                             />
-                            <button onClick={handleIncludeCustomTestCase} className="bg-gray-600 text-white px-4 py-2 rounded mt-2 hover:bg-gray-700">
-                                Include
+                            {/* --- UPDATED BUTTON --- */}
+                            <button 
+                                onClick={handleIncludeCustomTestCase} 
+                                disabled={isIncludingCustomCase}
+                                className="bg-gray-600 text-white px-4 py-2 rounded mt-2 hover:bg-gray-700 disabled:bg-gray-400"
+                            >
+                                {isIncludingCustomCase ? 'Generating...' : 'Include'}
                             </button>
                         </div>
                     </div>

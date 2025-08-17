@@ -5,6 +5,7 @@ import AuthPage from './components/AuthPage';
 import AdminDashboard from './components/AdminDashboard';
 import ProblemListPage from './components/ProblemListPage';
 import ProblemPage from './components/ProblemPage';
+import EditProblemPage from './components/EditProblemPage';
 
 // This is the "receptionist" component that handles redirection after login.
 const HomeRedirect = ({ userRole }) => {
@@ -46,10 +47,10 @@ const App = () => {
       <Routes>
         {/* This route now uses our smart receptionist */}
         <Route path="/" element={!token ? <AuthPage /> : <HomeRedirect userRole={userRole} />} />
-        
         <Route path="/admin" element={token && userRole === 'admin' ? <AdminDashboard /> : <Navigate to="/" />} />
         <Route path="/problems" element={token ? <ProblemListPage /> : <Navigate to="/" />} />
         <Route path="/problem/:id" element={token ? <ProblemPage /> : <Navigate to="/" />} />
+        <Route path="/problems/:id/edit" element={token && userRole === 'admin' ? <EditProblemPage /> : <Navigate to="/" />} />
       </Routes>
     </Router>
   );
