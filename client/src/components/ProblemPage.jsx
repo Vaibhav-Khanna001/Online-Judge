@@ -11,7 +11,7 @@ const ProblemPage = () => {
     const [language, setLanguage] = useState('cpp');
     const [runResults, setRunResults] = useState({});
     const [isRunning, setIsRunning] = useState(false);
-    const [isIncludingCustomCase, setIsIncludingCustomCase] = useState(false); // New state for custom case loading
+    const [isIncludingCustomCase, setIsIncludingCustomCase] = useState(false);
     const [topPaneHeight, setTopPaneHeight] = useState(65);
     const isResizing = useRef(false);
     const resizableContainerRef = useRef(null);
@@ -40,16 +40,14 @@ const ProblemPage = () => {
         fetchProblem();
     }, [id]);
 
-    // --- UPDATED FUNCTION ---
     const handleIncludeCustomTestCase = async () => {
         if (!customInput.trim()) {
             alert('Custom input cannot be empty.');
             return;
         }
-        setIsIncludingCustomCase(true); // Set loading state to true
+        setIsIncludingCustomCase(true);
 
         try {
-            // This new API endpoint runs the hidden solution code against the user's custom input
             const api = axios.create({
                 headers: { 'x-auth-token': localStorage.getItem('token') },
             });
@@ -61,7 +59,7 @@ const ProblemPage = () => {
             const newCustomCase = {
                 _id: `custom-${Date.now()}`,
                 input: customInput,
-                expectedOutput: response.data.output, // Use the actual output from the solution
+                expectedOutput: response.data.output,
                 isCustom: true
             };
             setDisplayedTestCases([...displayedTestCases, newCustomCase]);
@@ -70,7 +68,7 @@ const ProblemPage = () => {
             console.error("Failed to generate expected output:", err);
             alert('Could not generate the expected output for your custom input. Please try again.');
         } finally {
-            setIsIncludingCustomCase(false); // Reset loading state
+            setIsIncludingCustomCase(false);
         }
     };
     
@@ -192,13 +190,13 @@ const ProblemPage = () => {
                                         </div>
                                         {result && (
                                             <div className="mt-2">
-                                                <label className={`text-xs font-semibold ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                                                    { !result.success ? 'Error:' : 
-                                                      (isCorrect || tc.isCustom) ? 'Your Output:' : 'Your Output: (Wrong Answer)'
-                                                    }
-                                                    { isCorrect && !tc.isCustom && <span className="font-bold"> (Correct)</span> }
+                                                {/* --- FIX: Updated logic for the output heading --- */}
+                                                <label className={`text-xs font-semibold ${result.success && isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                                    { !result.success ? 'Error:' : 'Your Output:' }
+                                                    { result.success && !isCorrect && <span className="font-bold"> (Wrong Answer)</span> }
+                                                    { result.success && isCorrect && <span className="font-bold"> (Correct)</span> }
                                                 </label>
-                                                <pre className={`p-2 rounded text-sm mt-1 whitespace-pre-wrap ${isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
+                                                <pre className={`p-2 rounded text-sm mt-1 whitespace-pre-wrap ${result.success && isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
                                                     {result.output}
                                                 </pre>
                                             </div>
@@ -216,7 +214,6 @@ const ProblemPage = () => {
                                 placeholder="Enter your custom input here..."
                                 rows="3"
                             />
-                            {/* --- UPDATED BUTTON --- */}
                             <button 
                                 onClick={handleIncludeCustomTestCase} 
                                 disabled={isIncludingCustomCase}
