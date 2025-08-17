@@ -15,6 +15,9 @@ const ProblemPage = () => {
     const [topPaneHeight, setTopPaneHeight] = useState(65);
     const isResizing = useRef(false);
     const resizableContainerRef = useRef(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submissionResult, setSubmissionResult] = useState(null); // To store the verdict
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     const boilerplates = {
         cpp: `#include <iostream>\n#include <string>\n#include <vector>\n\nint main() {\n    // Your C++ code here\n    std::cout << "Hello World";\n    return 0;\n}`,
@@ -71,7 +74,7 @@ const ProblemPage = () => {
             setIsIncludingCustomCase(false);
         }
     };
-    
+
     const handleRunCode = async () => {
         setIsRunning(true);
         setRunResults({});
@@ -122,6 +125,28 @@ const ProblemPage = () => {
         window.removeEventListener('mouseup', handleMouseUp);
     };
 
+    const handleSubmit = async () => {
+        setIsSubmitting(true);
+        setSubmissionResult(null); // Clear previous results
+        try {
+            const api = axios.create({
+                headers: { 'x-auth-token': localStorage.getItem('token') },
+            });
+            const response = await api.post('http://localhost:5000/api/submit', {
+                language,
+                code,
+                problemId: id,
+            });
+            setSubmissionResult(response.data); // Save the verdict { verdict: '...', message: '...' }
+            setIsModalOpen(true);
+        } catch (error) {
+            const errorMsg = error.response ? error.response.data.message : "Network Error";
+            setSubmissionResult({ verdict: 'Error', message: errorMsg });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
 
     if (!problem) {
         return <div className="min-h-screen flex items-center justify-center">Loading Problem...</div>;
@@ -144,7 +169,13 @@ const ProblemPage = () => {
                         <button onClick={handleRunCode} disabled={isRunning} className="bg-green-500 text-white px-4 py-2 rounded mr-2 hover:bg-green-600 disabled:bg-gray-400">
                             {isRunning ? 'Running...' : 'Run'}
                         </button>
-                        <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Submit</button>
+                        <button
+                            onClick={handleSubmit}
+                            disabled={isSubmitting || isRunning}
+                            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:bg-gray-400"
+                        >
+                            {isSubmitting ? 'Submitting...' : 'Submit'}
+                        </button>
                     </div>
                     <div>
                         <label htmlFor="language" className="mr-2 font-medium">Language:</label>
@@ -176,7 +207,7 @@ const ProblemPage = () => {
                             {displayedTestCases.map((tc, index) => {
                                 const result = runResults[tc._id];
                                 const isCorrect = result && result.success && result.output.trim() === tc.expectedOutput.trim();
-                                
+
                                 return (
                                     <div key={tc._id} className={`border rounded-lg p-3 ${tc.isCustom ? 'border-blue-300 bg-blue-50' : 'bg-gray-50'}`}>
                                         <h3 className="font-bold">{tc.isCustom ? `Custom Case #${index + 1 - displayedTestCases.filter(c => !c.isCustom).length}` : `Sample Case #${index + 1}`}</h3>
@@ -192,9 +223,9 @@ const ProblemPage = () => {
                                             <div className="mt-2">
                                                 {/* --- FIX: Updated logic for the output heading --- */}
                                                 <label className={`text-xs font-semibold ${result.success && isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                                                    { !result.success ? 'Error:' : 'Your Output:' }
-                                                    { result.success && !isCorrect && <span className="font-bold"> (Wrong Answer)</span> }
-                                                    { result.success && isCorrect && <span className="font-bold"> (Correct)</span> }
+                                                    {!result.success ? 'Error:' : 'Your Output:'}
+                                                    {result.success && !isCorrect && <span className="font-bold"> (Wrong Answer)</span>}
+                                                    {result.success && isCorrect && <span className="font-bold"> (Correct)</span>}
                                                 </label>
                                                 <pre className={`p-2 rounded text-sm mt-1 whitespace-pre-wrap ${result.success && isCorrect ? 'bg-green-100' : 'bg-red-100'}`}>
                                                     {result.output}
@@ -214,8 +245,8 @@ const ProblemPage = () => {
                                 placeholder="Enter your custom input here..."
                                 rows="3"
                             />
-                            <button 
-                                onClick={handleIncludeCustomTestCase} 
+                            <button
+                                onClick={handleIncludeCustomTestCase}
                                 disabled={isIncludingCustomCase}
                                 className="bg-gray-600 text-white px-4 py-2 rounded mt-2 hover:bg-gray-700 disabled:bg-gray-400"
                             >
@@ -224,6 +255,27 @@ const ProblemPage = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div>
+                {isModalOpen && submissionResult && (
+                    <div className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50">
+                        <div className={`bg-white p-8 rounded-lg shadow-2xl text-center w-full max-w-md ${submissionResult.verdict === 'Successful' ? 'border-t-8 border-green-500' : 'border-t-8 border-red-500'
+                            }`}>
+                            <h2 className={`text-3xl font-bold mb-4 ${submissionResult.verdict === 'Successful' ? 'text-green-600' : 'text-red-600'
+                                }`}>
+                                {submissionResult.verdict}
+                            </h2>
+                            <p className="text-gray-700 mb-6">{submissionResult.message}</p>
+                            <button
+                                onClick={() => setIsModalOpen(false)}
+                                className="bg-gray-700 text-white px-6 py-2 rounded hover:bg-gray-800"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
