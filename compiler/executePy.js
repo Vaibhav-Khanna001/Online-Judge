@@ -2,8 +2,8 @@ const { spawn } = require("child_process");
 
 const executePy = (filepath, input) => {
     return new Promise((resolve, reject) => {
-        // Use spawn to run the python script
-        const childProcess = spawn("python", [filepath]);
+        // --- FIX: Use 'python3' to be compatible with the Docker container ---
+        const childProcess = spawn("python3", [filepath]);
 
         let output = '';
         let errorOutput = '';

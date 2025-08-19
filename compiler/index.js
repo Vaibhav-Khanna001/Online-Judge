@@ -1,81 +1,70 @@
 const express = require('express');
-const cors = require('cors');
+const { v4: uuid } = require('uuid');
 const fs = require('fs');
 const path = require('path');
-const { v4: uuid } = require('uuid');
+const cors = require('cors');
+
+// Import the separate execution functions
 const { executeCpp } = require('./executeCpp');
 const { executePy } = require('./executePy');
 const { executeJava } = require('./executeJava');
 
 const app = express();
-
 app.use(cors());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
+// Setup directory for code files
 const dirCodes = path.join(__dirname, 'codes');
 if (!fs.existsSync(dirCodes)) {
     fs.mkdirSync(dirCodes, { recursive: true });
 }
-app.get('/', (req, res) => {
-    res.send("hello world");
-});
+
+const generateFile = (language, code) => {
+    const jobId = uuid();
+    const filename = `${jobId}.${language}`;
+    const filepath = path.join(dirCodes, filename);
+    fs.writeFileSync(filepath, code);
+    return filepath;
+};
+
 app.post('/run', async (req, res) => {
-    const { language, code, input } = req.body;
-   console.log("code",code);
-    // --- ENHANCED DEBUGGING ---
-    // This will show us the exact data being received.
-    console.log("Full request body received:", req.body);
-    console.log("Language parameter received:", `"${language}"`);
+    const { language = 'cpp', code, input } = req.body;
 
-
-    if (code === undefined || code.trim() === '') {
+    if (code === undefined || code.trim() === "") {
         return res.status(400).json({ success: false, error: "Empty code body!" });
     }
 
-    const jobId = uuid();
-    const filepath = path.join(dirCodes, `${jobId}.${language}`);
-    
+    const filepath = generateFile(language, code);
+
     try {
-        fs.writeFileSync(filepath, code);
-
         let output;
-        
-        if (language === 'cpp') {
-            output = await executeCpp(filepath, input);
-        } else if (language === 'py') {
-            output = await executePy(filepath, input);
-        } else if (language === 'java') {
-            output = await executeJava(filepath, input);
-        } else {
-            // This is the block that is currently being triggered
-            return res.status(400).json({ success: false, error: "Unsupported language!" });
+        // --- UPDATE: Pass the raw input string directly to the execution functions ---
+        switch (language) {
+            case 'cpp':
+                output = await executeCpp(filepath, input);
+                break;
+            case 'py':
+                output = await executePy(filepath, input);
+                break;
+            case 'java':
+                output = await executeJava(filepath, input);
+                break;
+            default:
+                return res.status(400).json({ success: false, error: "Unsupported language" });
         }
-
-        return res.json({ success: true, output });
-
-    } catch (error) {
-        const errorDetails = error.stderr || error;
-        return res.status(500).json({ success: false, error: errorDetails });
+        res.json({ output });
+    } catch (err) {
+        // The 'err' from spawn-based promises is often the stderr string directly
+        res.status(500).json({ error: err.stderr || err });
     } finally {
-        if (fs.existsSync(filepath)) {
-            fs.unlinkSync(filepath);
-        }
-        if (language === 'cpp') {
-            const exePath = path.join(__dirname, 'outputs', `${jobId}.exe`);
-            if (fs.existsSync(exePath)) {
-                fs.unlinkSync(exePath);
-            }
-        } else if (language === 'java') {
-            const classPath = path.join(__dirname, 'outputs', 'Main.class');
-             if (fs.existsSync(classPath)) {
-                fs.unlinkSync(classPath);
-            }
-        }
+        // Clean up the generated code file
+        fs.unlink(filepath, () => {});
     }
 });
 
-const PORT = 5001; 
+const PORT = 5001;
 app.listen(PORT, () => {
     console.log(`Compiler microservice running on port ${PORT}`);
 });
+

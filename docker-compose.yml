@@ -1,0 +1,44 @@
+# Specifies the version of the Docker Compose file format. Version 3 is the modern standard.
+version: '3.8'
+
+# This is the main section where we define all the parts (services) of our application.
+services:
+
+  # 1. The Backend Service
+  backend:
+    # Tells Docker Compose to build this image from the 'server' directory.
+    build: ./server
+    # Gives the container a specific name for easy identification.
+    container_name: online-judge-backend
+    # Maps port 5000 on your computer to port 5000 in the container.
+    ports:
+      - "5000:5000"
+    # Environment variables are now read from the .env file in your project's root directory.
+    # This keeps your secrets secure and out of your main configuration.
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - JWT_SECRET=${JWT_SECRET}
+    # This ensures the compiler service is started before the backend starts.
+    depends_on:
+      - compiler
+
+  # 2. The Frontend Service
+  frontend:
+    # Builds the image from the 'client' directory.
+    build: ./client
+    container_name: online-judge-frontend
+    # Maps port 5173 on your computer to port 80 in the container (where Nginx is running).
+    ports:
+      - "5173:80"
+    # This ensures the backend service is started before the frontend starts.
+    depends_on:
+      - backend
+
+  # 3. The Compiler Microservice
+  compiler:
+    # Builds the image from the 'compiler' directory.
+    build: ./compiler
+    container_name: online-judge-compiler
+    # Maps port 5001 for communication with the backend.
+    ports:
+      - "5001:5001"

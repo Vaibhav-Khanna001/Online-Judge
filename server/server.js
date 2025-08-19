@@ -25,7 +25,7 @@ app.use(cors());
 app.use(express.json());
 
 // Define Routes
-app.get('/', (req, res) => res.send('API Running'));
+app.get('/', (req, res) => res.send('Backend Working'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/problems', require('./routes/problems'));
 app.use('/api/users', require('./routes/users'));

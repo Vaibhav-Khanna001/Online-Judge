@@ -6,8 +6,8 @@ const axios = require('axios');
 const Problem = require('../models/Problem');
 const TestCase = require('../models/TestCase');
 
-// The URL for your separate compiler microservice.
-const COMPILER_SERVICE_URL = 'http://localhost:5001/run'; // Make sure this is correct
+// --- FIX: Use the Docker service name instead of localhost ---
+const COMPILER_SERVICE_URL = 'http://compiler:5001/run'; 
 
 // @route   POST api/submit
 // @desc    Submit user's code for judging against all test cases
@@ -31,7 +31,7 @@ router.post(
         const { language, code, problemId } = req.body;
 
         try {
-            // 1. Fetch ALL test cases for the problem (including hidden ones)
+            // 1. Fetch ALL test cases for the problem
             const allTestCases = await TestCase.find({ problem: problemId });
 
             if (allTestCases.length === 0) {
@@ -41,7 +41,7 @@ router.post(
             // 2. Loop through each test case and judge the code
             for (const tc of allTestCases) {
                 try {
-                    // Call the compiler microservice with the user's code and the current test case's input
+                    // Call the compiler microservice with the user's code
                     const response = await axios.post(COMPILER_SERVICE_URL, {
                         language,
                         code,
@@ -53,14 +53,12 @@ router.post(
 
                     // 3. Compare the output
                     if (userOutput !== expectedOutput) {
-                        // If any test case fails, immediately return a "Failed" verdict
                         return res.json({ 
                             verdict: 'Failed', 
                             message: `Wrong Answer on test case #${allTestCases.indexOf(tc) + 1}` 
                         });
                     }
                 } catch (compilerError) {
-                    // If the code fails to compile or has a runtime error
                     const errorMsg = compilerError.response ? (compilerError.response.data.error || 'Error from compiler service') : 'Error communicating with compiler service';
                     return res.json({ 
                         verdict: 'Error', 
