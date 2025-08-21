@@ -1,11 +1,9 @@
 # Online Judge - Setup Guide
 
-## Environment Variables
-
 This project uses a `.env` file for sensitive configuration.  
 Create a `.env` file in the project root.  
 
-Here is a sample `.env` template you can use:
+Below is a sample `.env` template used for this project:
 
 ```env
 MONGO_URI = your_mongo_url
