@@ -9,3 +9,10 @@ Below is a sample `.env` template used for this project:
 MONGO_URI = your_mongo_url
 JWT_SECRET = your_jwt_secret_key
 GEMINI_API_KEY = your_gemini_api_key
+```
+
+To start the Docker Container use the below command -->
+
+```env
+docker-compose up
+```
